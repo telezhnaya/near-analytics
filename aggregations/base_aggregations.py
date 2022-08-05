@@ -1,6 +1,7 @@
 import abc
 import dataclasses
 import psycopg2
+import typing
 
 
 # Base class with all public methods needed to interact with each aggregation
@@ -31,7 +32,5 @@ class BaseAggregations(abc.ABC):
     def drop_table(self):
         pass
 
-    # Be careful, don't create circular dependencies
-    @abc.abstractmethod
-    def dependencies(self) -> list:
-        pass
+# Be careful, don't create circular dependencies
+BaseAggregations.DEPENDENCIES = []

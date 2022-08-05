@@ -7,9 +7,6 @@ from .db_tables import time_json, daily_start_of_range
 
 
 class SqlAggregations(BaseAggregations):
-    def dependencies(self) -> list:
-        return []
-
     @property
     @abc.abstractmethod
     def sql_create_table(self):

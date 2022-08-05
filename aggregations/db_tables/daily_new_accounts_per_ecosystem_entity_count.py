@@ -6,8 +6,7 @@ from ..periodic_aggregations import PeriodicAggregations
 
 # This metric is computed based on `daily_accounts_added_per_ecosystem_entity` table in Analytics DB
 class DailyNewAccountsPerEcosystemEntityCount(PeriodicAggregations):
-    def dependencies(self) -> list:
-        return ["daily_accounts_added_per_ecosystem_entity"]
+    DEPENDENCIES = ["daily_accounts_added_per_ecosystem_entity"]
 
     @property
     def sql_create_table(self):

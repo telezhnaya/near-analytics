@@ -88,31 +88,46 @@ def compute(
 
 
 def compute_statistics(
-    analytics_connection,
-    indexer_connection,
+    analytics_database_url,
+    indexer_database_url,
     statistics_type: str,
     timestamp: typing.Optional[int],
     collect_all,
 ):
     statistics_cls = STATS[statistics_type]
-    statistics = statistics_cls(analytics_connection, indexer_connection)
 
-    for cls in statistics.dependencies():
+    for cls in statistics_cls.DEPENDENCIES:
         compute_statistics(
-            analytics_connection, indexer_connection, cls, timestamp, collect_all
+            analytics_database_url, indexer_database_url, cls, timestamp, collect_all
         )
 
+    analytics_connection = psycopg2.connect(analytics_database_url)
+    indexer_connection = psycopg2.connect(indexer_database_url)
     if collect_all:
+        statistics = statistics_cls(analytics_connection, indexer_connection)
         statistics.drop_table()
         current_day = query_genesis_timestamp(indexer_connection)
         while current_day < int(time.time()):
-            compute(
-                analytics_connection,
-                indexer_connection,
-                statistics_type,
-                statistics,
-                current_day,
-            )
+            for attempt in range(10, 0, -1):
+                try:
+                    compute(
+                        analytics_connection,
+                        indexer_connection,
+                        statistics_type,
+                        statistics_cls(analytics_connection, indexer_connection),
+                        current_day,
+                    )
+                except Exception:
+                    import traceback
+                    print(f"Compute for {current_day} failed. See details below.")
+                    traceback.print_exc()
+                    if attempt == 0:
+                        raise
+                    print(f"Retrying...")
+                    analytics_connection = psycopg2.connect(analytics_database_url)
+                    indexer_connection = psycopg2.connect(indexer_database_url)
+                else:
+                    break
             current_day += DAY_LEN_SECONDS
     else:
         # Computing for yesterday by default
@@ -121,7 +136,7 @@ def compute_statistics(
             analytics_connection,
             indexer_connection,
             statistics_type,
-            statistics,
+            statistics_cls(analytics_connection, indexer_connection),
             timestamp,
         )
 
@@ -167,24 +182,20 @@ if __name__ == "__main__":
         print(f"Attempt {i}...")
         stats_computed = set()
         try:
-            with psycopg2.connect(
-                ANALYTICS_DATABASE_URL
-            ) as analytics_connection, psycopg2.connect(
-                INDEXER_DATABASE_URL
-            ) as indexer_connection:
-                for stats_type in stats_need_to_compute:
-                    try:
-                        compute_statistics(
-                            analytics_connection,
-                            indexer_connection,
-                            stats_type,
-                            args.timestamp,
-                            args.all,
-                        )
-                        stats_computed.add(stats_type)
-                    except psycopg2.Error as e:
-                        print(f"Failed to compute the value for {stats_type}")
-                        print(e)
+            for stats_type in stats_need_to_compute:
+                try:
+                    compute_statistics(
+                        ANALYTICS_DATABASE_URL,
+                        INDEXER_DATABASE_URL,
+                        stats_type,
+                        args.timestamp,
+                        args.all,
+                    )
+                    stats_computed.add(stats_type)
+                except Exception:
+                    print(f"Failed to compute the value for {stats_type}")
+                    import traceback
+                    traceback.print_exc()
 
         except Exception as e:
             # If we lost connection and try to catch related DB exception here,
