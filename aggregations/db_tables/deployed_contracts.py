@@ -126,7 +126,8 @@ class DeployedContracts(PeriodicAggregations):
                             likely_sdk_types.add('RS')
                         if b'JS_TAG_MODULE' in contract_code and b'quickjs-libc-min.js' in contract_code:
                             likely_sdk_types.add('JS')
-                        if b'l\x00i\x00b\x00/\x00a\x00s\x00s\x00e\x00m\x00b\x00l\x00y\x00s\x00c\x00r\x00i\x00p\x00t' in contract_code:
+                        if b'l\x00i\x00b\x00/\x00a\x00s\x00s\x00e\x00m\x00b\x00l\x00y\x00s\x00c\x00r\x00i\x00p\x00t' in contract_code \
+                            or b'~lib/near-sdk-core/collections/persistentMap/PersistentMap' in contract_code:
                             likely_sdk_types.add('AS')
 
                         # Only set the sdk type if exactly one match is received since if we matched multiple, it is impossible to make a call.
