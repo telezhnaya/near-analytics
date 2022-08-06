@@ -22,9 +22,13 @@ class DeployedContracts(PeriodicAggregations):
                 ON deployed_contracts__TEST (deployed_at_block_timestamp);
             CREATE INDEX IF NOT EXISTS deployed_contracts_sha256_idx__TEST
                 ON deployed_contracts__TEST (contract_code_sha256);
+            CREATE INDEX IF NOT EXISTS deployed_contracts_deployed_to_account_id_idx__TEST
+                ON deployed_contracts__TEST (deployed_to_account_id);
             ALTER TABLE deployed_contracts__TEST
                 ADD COLUMN IF NOT EXISTS deployed_at_block_hash text NOT NULL DEFAULT '',
                 ADD COLUMN IF NOT EXISTS contract_sdk_type text NOT NULL DEFAULT '';
+            CREATE INDEX IF NOT EXISTS deployed_contracts_contract_sdk_type_idx__TEST
+                ON deployed_contracts__TEST (contract_sdk_type);
         """
 
     @property
@@ -84,8 +88,12 @@ class DeployedContracts(PeriodicAggregations):
             for _ in range(1000):
                 try:
                     response = near_rpc.json_rpc('query', {"request_type": "view_code", "account_id": account_id, "block_id": block_id})
-                except Exception as e:
-                    print('Retrying fetching contract code...', e)
+                except Exception:
+                    print("Retrying fetching contract code...")
+                    import traceback
+                    traceback.print_exc()
+                else:
+                    break
             return base64.b64decode(response["code_base64"])
 
         sql_missing_sdk_type = """
@@ -108,17 +116,23 @@ class DeployedContracts(PeriodicAggregations):
                     print('fetching ', contract_account_id)
                     contract_code = view_code(contract_account_id, deployed_at_block_hash)
 
-                    likely_sdk_types = set()
-                    if b'__data_end' in contract_code and b'__heap_base' in contract_code:
-                        likely_sdk_types.add('rs')
-                    if b'JS_TAG_MODULE' in contract_code and b'quickjs-libc-min.js' in contract_code:
-                        likely_sdk_types.add('js')
-                    if b'env\x05input\x00\x08\x03env\x0Cregister_len' in contract_code[:1000]:
-                        likely_sdk_types.add('as')
+                    if contract_code == b'':
+                        contract_sdk_type = 'empty'
+                    else:
+                        likely_sdk_types = set()
+                        if b'__data_end' in contract_code and b'__heap_base' in contract_code:
+                            likely_sdk_types.add('rs')
+                        if b'JS_TAG_MODULE' in contract_code and b'quickjs-libc-min.js' in contract_code:
+                            likely_sdk_types.add('js')
+                        if (
+                                b'env\x05input\x00\x08\x03env\x0Cregister_len' in contract_code[:1000] or
+                                b'env\x05input\x00\x09\x03env\x0Cregister_len' in contract_code[:1000]
+                        ):
+                            likely_sdk_types.add('as')
 
-                    # Only set the sdk type if exactly one match is received since if we matched multiple, it is impossible to make a call.
-                    contract_sdk_type = likely_sdk_types.pop() if len(likely_sdk_types) == 1 else 'unknown'
-                    print(contract_account_id, contract_sdk_type, likely_sdk_types)
+                        # Only set the sdk type if exactly one match is received since if we matched multiple, it is impossible to make a call.
+                        contract_sdk_type = likely_sdk_types.pop() if len(likely_sdk_types) == 1 else 'unknown'
+                        print(contract_account_id, contract_sdk_type, likely_sdk_types)
 
                     contract_sdk_types.append((contract_code_sha256, contract_sdk_type))
 
