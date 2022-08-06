@@ -130,7 +130,7 @@ class DeployedContracts(PeriodicAggregations):
                             likely_sdk_types.add('AS')
 
                         # Only set the sdk type if exactly one match is received since if we matched multiple, it is impossible to make a call.
-                        contract_sdk_type = likely_sdk_types.pop() if len(likely_sdk_types) == 1 else 'unknown'
+                        contract_sdk_type = likely_sdk_types.pop() if len(likely_sdk_types) == 1 else 'UNKNOWN'
                         print(contract_account_id, contract_sdk_type, likely_sdk_types)
 
                     contract_sdk_types.append((contract_code_sha256, contract_sdk_type))
