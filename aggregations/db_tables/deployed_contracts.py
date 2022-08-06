@@ -117,18 +117,17 @@ class DeployedContracts(PeriodicAggregations):
                     contract_code = view_code(contract_account_id, deployed_at_block_hash)
 
                     if contract_code == b'':
-                        contract_sdk_type = 'empty'
+                        contract_sdk_type = 'EMPTY'
+                    elif not contract_code.startswith(b'\0asm'):
+                        contract_sdk_type = 'NOT_WASM'
                     else:
                         likely_sdk_types = set()
                         if b'__data_end' in contract_code and b'__heap_base' in contract_code:
-                            likely_sdk_types.add('rs')
+                            likely_sdk_types.add('RS')
                         if b'JS_TAG_MODULE' in contract_code and b'quickjs-libc-min.js' in contract_code:
-                            likely_sdk_types.add('js')
-                        if (
-                                b'env\x05input\x00\x08\x03env\x0Cregister_len' in contract_code[:1000] or
-                                b'env\x05input\x00\x09\x03env\x0Cregister_len' in contract_code[:1000]
-                        ):
-                            likely_sdk_types.add('as')
+                            likely_sdk_types.add('JS')
+                        if b'l\x00i\x00b\x00/\x00a\x00s\x00s\x00e\x00m\x00b\x00l\x00y\x00s\x00c\x00r\x00i\x00p\x00t' in contract_code:
+                            likely_sdk_types.add('AS')
 
                         # Only set the sdk type if exactly one match is received since if we matched multiple, it is impossible to make a call.
                         contract_sdk_type = likely_sdk_types.pop() if len(likely_sdk_types) == 1 else 'unknown'
