@@ -82,7 +82,10 @@ class DeployedContracts(PeriodicAggregations):
     def store(self, parameters: list) -> list:
         super().store(parameters)
 
-        near_rpc = near_api.providers.JsonProvider('https://archival-rpc.mainnet.near.org')
+        near_rpc_url = os.getenv('NEAR_RPC_URL')
+        if not near_rpc_url:
+            return
+        near_rpc = near_api.providers.JsonProvider(near_rpc_url)
 
         def view_code(account_id, block_id):
             for _ in range(1000):
