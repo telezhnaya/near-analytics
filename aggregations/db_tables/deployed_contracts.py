@@ -91,6 +91,12 @@ class DeployedContracts(PeriodicAggregations):
             for _ in range(1000):
                 try:
                     response = near_rpc.json_rpc('query', {"request_type": "view_code", "account_id": account_id, "block_id": block_id})
+                except near_api.providers.JsonProviderError as e:
+                    if e.args[0].get('cause', {}).get('name') == 'UNKNOWN_ACCOUNT':
+                        return b''
+                    print("Retrying fetching contract code...")
+                    import traceback
+                    traceback.print_exc()
                 except Exception:
                     print("Retrying fetching contract code...")
                     import traceback
