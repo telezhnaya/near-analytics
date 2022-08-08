@@ -32,5 +32,6 @@ class BaseAggregations(abc.ABC):
     def drop_table(self):
         pass
 
+
 # Be careful, don't create circular dependencies
 BaseAggregations.DEPENDENCIES = []

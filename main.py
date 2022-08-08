@@ -3,6 +3,7 @@ import dotenv
 import os
 import psycopg2
 import time
+import traceback
 import typing
 
 from aggregations import (
@@ -118,7 +119,6 @@ def compute_statistics(
                         current_day,
                     )
                 except Exception:
-                    import traceback
                     print(f"Compute for {current_day} failed. See details below.")
                     traceback.print_exc()
                     if attempt == 0:
@@ -194,7 +194,6 @@ if __name__ == "__main__":
                     stats_computed.add(stats_type)
                 except Exception:
                     print(f"Failed to compute the value for {stats_type}")
-                    import traceback
                     traceback.print_exc()
 
         except Exception as e:
