@@ -111,13 +111,17 @@ class DeployedContracts(PeriodicAggregations):
                     traceback.print_exc()
                 else:
                     break
+            else:
+                raise Exception(
+                    "Could not download contract code even after 1000 retries"
+                )
             return base64.b64decode(response["code_base64"])
 
         sql_missing_sdk_type = """
             SELECT contract_code_sha256, deployed_to_account_id, deployed_at_block_hash
             FROM deployed_contracts
             WHERE contract_sdk_type = '' AND deployed_at_block_hash != ''
-            LIMIT 10
+            LIMIT 100
         """
 
         with self.analytics_connection.cursor() as analytics_cursor:
@@ -140,21 +144,26 @@ class DeployedContracts(PeriodicAggregations):
                     )
 
                     if contract_code == b"":
+                        # Since there is no way to remove a contract once deployed, users can only deploy an empty file to reduce the storage usage.
                         contract_sdk_type = "EMPTY"
                     elif not contract_code.startswith(b"\0asm"):
+                        # Sometimes people deploy some garbage (images, text files, etc).
                         contract_sdk_type = "NOT_WASM"
                     else:
                         likely_sdk_types = set()
+
                         if (
                             b"__data_end" in contract_code
                             and b"__heap_base" in contract_code
                         ):
                             likely_sdk_types.add("RS")
+
                         if (
                             b"JS_TAG_MODULE" in contract_code
                             and b"quickjs-libc-min." in contract_code
                         ):
                             likely_sdk_types.add("JS")
+
                         if (
                             b"l\x00i\x00b\x00/\x00a\x00s\x00s\x00e\x00m\x00b\x00l\x00y\x00s\x00c\x00r\x00i\x00p\x00t"
                             in contract_code
@@ -164,11 +173,11 @@ class DeployedContracts(PeriodicAggregations):
                             likely_sdk_types.add("AS")
 
                         # Only set the sdk type if exactly one match is received since if we matched multiple, it is impossible to make a call.
-                        contract_sdk_type = (
-                            likely_sdk_types.pop()
-                            if len(likely_sdk_types) == 1
-                            else "UNKNOWN"
-                        )
+                        if len(likely_sdk_types) == 1:
+                            contract_sdk_type = likely_sdk_types.pop()
+                        else:
+                            contract_sdk_type = "UNKNOWN"
+
                         print(contract_account_id, contract_sdk_type, likely_sdk_types)
 
                     contract_sdk_types.append((contract_code_sha256, contract_sdk_type))
