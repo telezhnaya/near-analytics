@@ -86,7 +86,6 @@ class UniqueContracts(PeriodicAggregations):
                 time_range_json(from_timestamp, self.duration_seconds),
             )
             result = analytics_cursor.fetchall()
-            print(result)
             return self.prepare_data(result, start_of_range=from_timestamp)
 
     @staticmethod
