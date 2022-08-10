@@ -112,13 +112,14 @@ class UniqueContracts(PeriodicAggregations):
             WHERE contract_sdk_type = ''
             LIMIT 100
         """
-        print('qwe')
 
         with self.analytics_connection.cursor() as analytics_cursor:
             while True:
                 analytics_cursor.execute(sql_missing_sdk_type)
                 unknown_contracts = analytics_cursor.fetchall()
-                print('unknown', unknown_contracts)
+                print(
+                    f"INFO: There are {len(unknown_contracts)} unique contracts pending for SDK type identification..."
+                )
                 if not unknown_contracts:
                     break
 
@@ -142,7 +143,7 @@ class UniqueContracts(PeriodicAggregations):
                     contract_sdk_types.append((contract_code_sha256, contract_sdk_type))
 
                 sql_update_contract_sdk_types = ";".join(
-                    f"""UPDATE deployed_contracts SET contract_sdk_type = '{contract_sdk_type}' WHERE contract_code_sha256 = '{contract_code_sha256}'"""
+                    f"""UPDATE unique_contracts SET contract_sdk_type = '{contract_sdk_type}' WHERE contract_code_sha256 = '{contract_code_sha256}'"""
                     for (contract_code_sha256, contract_sdk_type) in contract_sdk_types
                 )
                 analytics_cursor.execute(sql_update_contract_sdk_types)
@@ -151,7 +152,9 @@ class UniqueContracts(PeriodicAggregations):
         print("INFO: Finished updating unique_contracts")
 
 
-def download_contract_code(near_rpc: near_api.providers.JsonProvider, account_id: str, block_id: str) -> bytes:
+def download_contract_code(
+    near_rpc: near_api.providers.JsonProvider, account_id: str, block_id: str
+) -> bytes:
     for _ in range(1000):
         try:
             response = near_rpc.json_rpc(
@@ -173,9 +176,7 @@ def download_contract_code(near_rpc: near_api.providers.JsonProvider, account_id
         else:
             return base64.b64decode(response["code_base64"])
 
-    raise Exception(
-        "Could not download contract code even after 1000 retries"
-    )
+    raise Exception("Could not download contract code even after 1000 retries")
 
 
 def get_contract_sdk_type(contract_code: bytes, contract_code_sha256: str) -> str:
