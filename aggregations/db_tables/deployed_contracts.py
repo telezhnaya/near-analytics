@@ -80,10 +80,14 @@ class DeployedContracts(PeriodicAggregations):
 
     @staticmethod
     def prepare_data(parameters: list, *, start_of_range=None, **kwargs) -> list:
+        print("INFO: Preparing deployed_contracts...")
         return parameters
 
     def store(self, parameters: list) -> list:
+        print("INFO: Storing deployed_contracts...")
         super().store(parameters)
+
+        print("INFO: Updating SDK types in deployed_contracts...")
 
         near_rpc_url = os.getenv("NEAR_RPC_URL")
         if not near_rpc_url:
@@ -104,10 +108,10 @@ class DeployedContracts(PeriodicAggregations):
                 except near_api.providers.JsonProviderError as e:
                     if e.args[0].get("cause", {}).get("name") == "UNKNOWN_ACCOUNT":
                         return b""
-                    print("Retrying fetching contract code...")
+                    print("WARN: Retrying fetching contract code...")
                     traceback.print_exc()
                 except Exception:
-                    print("Retrying fetching contract code...")
+                    print("WARN: Retrying fetching contract code...")
                     traceback.print_exc()
                 else:
                     break
@@ -130,7 +134,6 @@ class DeployedContracts(PeriodicAggregations):
                 unknown_contracts = analytics_cursor.fetchall()
                 if not unknown_contracts:
                     break
-                print(unknown_contracts)
 
                 contract_sdk_types = []
                 for (
@@ -138,47 +141,16 @@ class DeployedContracts(PeriodicAggregations):
                     contract_account_id,
                     deployed_at_block_hash,
                 ) in unknown_contracts:
-                    print("fetching ", contract_account_id)
+                    print(
+                        f"INFO: Fetching contract code for {contract_account_id} at block {deployed_at_block_hash}..."
+                    )
                     contract_code = view_code(
                         contract_account_id, deployed_at_block_hash
                     )
 
-                    if contract_code == b"":
-                        # Since there is no way to remove a contract once deployed, users can only deploy an empty file to reduce the storage usage.
-                        contract_sdk_type = "EMPTY"
-                    elif not contract_code.startswith(b"\0asm"):
-                        # Sometimes people deploy some garbage (images, text files, etc).
-                        contract_sdk_type = "NOT_WASM"
-                    else:
-                        likely_sdk_types = set()
-
-                        if (
-                            b"__data_end" in contract_code
-                            and b"__heap_base" in contract_code
-                        ):
-                            likely_sdk_types.add("RS")
-
-                        if (
-                            b"JS_TAG_MODULE" in contract_code
-                            and b"quickjs-libc-min." in contract_code
-                        ):
-                            likely_sdk_types.add("JS")
-
-                        if (
-                            b"l\x00i\x00b\x00/\x00a\x00s\x00s\x00e\x00m\x00b\x00l\x00y\x00s\x00c\x00r\x00i\x00p\x00t"
-                            in contract_code
-                            or b"~lib/near-sdk-core/collections/persistentMap/PersistentMap"
-                            in contract_code
-                        ):
-                            likely_sdk_types.add("AS")
-
-                        # Only set the sdk type if exactly one match is received since if we matched multiple, it is impossible to make a call.
-                        if len(likely_sdk_types) == 1:
-                            contract_sdk_type = likely_sdk_types.pop()
-                        else:
-                            contract_sdk_type = "UNKNOWN"
-
-                        print(contract_account_id, contract_sdk_type, likely_sdk_types)
+                    contract_sdk_type = get_contract_sdk_type(
+                        contract_code, contract_code_sha256
+                    )
 
                     contract_sdk_types.append((contract_code_sha256, contract_sdk_type))
 
@@ -188,4 +160,41 @@ class DeployedContracts(PeriodicAggregations):
                 )
                 analytics_cursor.execute(sql_update_contract_sdk_types)
                 self.analytics_connection.commit()
-                print("done updating")
+
+        print("INFO: Finished updating deployed_contracts")
+
+
+def get_contract_sdk_type(contract_code, contract_code_sha256):
+    # Since there is no way to remove a contract once deployed, users can only deploy an empty file to reduce the storage usage.
+    if contract_code == b"":
+        return "EMPTY"
+
+    # Sometimes people deploy some garbage (images, text files, etc).
+    if not contract_code.startswith(b"\0asm"):
+        return "NOT_WASM"
+
+    likely_sdk_types = set()
+
+    if b"__data_end" in contract_code and b"__heap_base" in contract_code:
+        likely_sdk_types.add("RS")
+
+    if b"JS_TAG_MODULE" in contract_code and b"quickjs-libc-min." in contract_code:
+        likely_sdk_types.add("JS")
+
+    if (
+        b"l\x00i\x00b\x00/\x00a\x00s\x00s\x00e\x00m\x00b\x00l\x00y\x00s\x00c\x00r\x00i\x00p\x00t"
+        in contract_code
+        or b"~lib/near-sdk-core/collections/persistentMap/PersistentMap"
+        in contract_code
+    ):
+        likely_sdk_types.add("AS")
+
+    # Only set the sdk type if exactly one match is received since if we matched multiple, it is impossible to make a call.
+    if len(likely_sdk_types) == 1:
+        return likely_sdk_types.pop()
+    else:
+        if len(likely_sdk_types) > 1:
+            print(
+                f"WARN: We detected markers of several programming languages ({likely_sdk_types}) at once for contract with hash {contract_code_sha256}, falling back to UNKNOWN type..."
+            )
+        return "UNKNOWN"
