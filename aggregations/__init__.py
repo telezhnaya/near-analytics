@@ -25,5 +25,6 @@ from .db_tables.daily_transaction_count_by_gas_burnt_ranges import (
 )
 from .db_tables.daily_transactions_count import DailyTransactionsCount
 from .db_tables.deployed_contracts import DeployedContracts
+from .db_tables.unique_contracts import UniqueContracts
 from .db_tables.weekly_active_accounts_count import WeeklyActiveAccountsCount
 from .db_tables.near_ecosystem_entities import NearEcosystemEntities

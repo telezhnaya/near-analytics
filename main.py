@@ -24,6 +24,7 @@ from aggregations import (
     DailyTransactionCountByGasBurntRanges,
     DailyTransactionsCount,
     DeployedContracts,
+    UniqueContracts,
     WeeklyActiveAccountsCount,
     NearEcosystemEntities,
 )
@@ -50,6 +51,7 @@ STATS = {
     "daily_transaction_count_by_gas_burnt_ranges": DailyTransactionCountByGasBurntRanges,
     "daily_transactions_count": DailyTransactionsCount,
     "deployed_contracts": DeployedContracts,
+    "unique_contracts": UniqueContracts,
     "weekly_active_accounts_count": WeeklyActiveAccountsCount,
     "near_ecosystem_entities": NearEcosystemEntities,
 }
