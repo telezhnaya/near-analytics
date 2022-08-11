@@ -206,9 +206,9 @@ def get_contract_sdk_type(contract_code: bytes, contract_code_sha256: str) -> st
     # Only set the sdk type if exactly one match is received since if we matched multiple, it is impossible to make a call.
     if len(likely_sdk_types) == 1:
         return likely_sdk_types.pop()
-    else:
-        if len(likely_sdk_types) > 1:
-            print(
-                f"WARN: We detected markers of several programming languages ({likely_sdk_types}) at once for contract with hash {contract_code_sha256}, falling back to UNKNOWN type..."
-            )
-        return "UNKNOWN"
+
+    if len(likely_sdk_types) > 1:
+        print(
+            f"WARN: We detected markers of several programming languages ({likely_sdk_types}) at once for contract with hash {contract_code_sha256}, falling back to UNKNOWN type..."
+        )
+    return "UNKNOWN"

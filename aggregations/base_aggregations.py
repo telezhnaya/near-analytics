@@ -1,7 +1,6 @@
 import abc
 import dataclasses
 import psycopg2
-import typing
 
 
 # Base class with all public methods needed to interact with each aggregation
