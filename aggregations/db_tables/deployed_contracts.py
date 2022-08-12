@@ -18,7 +18,11 @@ class DeployedContracts(PeriodicAggregations):
             CREATE INDEX IF NOT EXISTS deployed_contracts_timestamp_idx
                 ON deployed_contracts (deployed_at_block_timestamp);
             CREATE INDEX IF NOT EXISTS deployed_contracts_sha256_idx
-                ON deployed_contracts (contract_code_sha256)
+                ON deployed_contracts (contract_code_sha256);
+            CREATE INDEX IF NOT EXISTS deployed_contracts_deployed_to_account_id_idx
+                ON deployed_contracts (deployed_to_account_id);
+            ALTER TABLE deployed_contracts
+                ADD COLUMN IF NOT EXISTS deployed_at_block_hash text NOT NULL DEFAULT '';
         """
 
     @property
@@ -32,21 +36,29 @@ class DeployedContracts(PeriodicAggregations):
         return """
             SELECT
                 action_receipt_actions.args->>'code_sha256' as contract_code_sha256,
-                receipts.receiver_account_id as deployed_to_account_id,
-                receipts.receipt_id as deployed_by_receipt_id,
-                receipts.included_in_block_timestamp as deployed_at_block_timestamp
+                action_receipt_actions.receipt_receiver_account_id as deployed_to_account_id,
+                action_receipt_actions.receipt_id as deployed_by_receipt_id,
+                execution_outcomes.executed_in_block_timestamp as deployed_at_block_timestamp,
+                execution_outcomes.executed_in_block_hash as deployed_at_block_hash
             FROM action_receipt_actions
-            JOIN receipts ON receipts.receipt_id = action_receipt_actions.receipt_id
-            WHERE action_kind = 'DEPLOY_CONTRACT'
-                AND receipts.included_in_block_timestamp >= %(from_timestamp)s
-                AND receipts.included_in_block_timestamp < %(to_timestamp)s
-            ORDER BY receipts.included_in_block_timestamp
+            JOIN execution_outcomes ON execution_outcomes.receipt_id = action_receipt_actions.receipt_id
+            WHERE action_receipt_actions.action_kind = 'DEPLOY_CONTRACT'
+                AND execution_outcomes.status = 'SUCCESS_VALUE'
+                AND execution_outcomes.executed_in_block_timestamp >= %(from_timestamp)s
+                AND execution_outcomes.executed_in_block_timestamp < %(to_timestamp)s
+            ORDER BY execution_outcomes.executed_in_block_timestamp
         """
 
     @property
     def sql_insert(self):
         return """
-            INSERT INTO deployed_contracts VALUES %s 
+            INSERT INTO deployed_contracts (
+                contract_code_sha256,
+                deployed_to_account_id,
+                deployed_by_receipt_id,
+                deployed_at_block_timestamp,
+                deployed_at_block_hash
+            ) VALUES %s
             ON CONFLICT DO NOTHING
         """
 

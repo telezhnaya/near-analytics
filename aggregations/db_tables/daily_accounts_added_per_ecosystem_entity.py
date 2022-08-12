@@ -9,8 +9,7 @@ and is originally intended to be used for tracking new accounts added to each en
 
 
 class DailyAccountsAddedPerEcosystemEntity(PeriodicAggregations):
-    def dependencies(self) -> list:
-        return ["near_ecosystem_entities"]
+    DEPENDENCIES = ["near_ecosystem_entities"]
 
     @property
     def sql_create_table(self):

@@ -2,3 +2,4 @@ black==21.11b1
 psycopg2==2.9.1
 python-dotenv
 requests==2.26.0
+near-api-py

@@ -6,8 +6,7 @@ from ..periodic_aggregations import PeriodicAggregations
 
 # This metric is computed based on `deployed_contracts` table in Analytics DB
 class DailyNewUniqueContractsCount(PeriodicAggregations):
-    def dependencies(self) -> list:
-        return ["deployed_contracts"]
+    DEPENDENCIES = ["deployed_contracts"]
 
     @property
     def sql_create_table(self):
